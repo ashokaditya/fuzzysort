@@ -26,10 +26,10 @@ https://rawgit.com/farzher/fuzzysort/master/test.html
 ## Installation Node
 
 ```sh
-npm i fuzzysort
-node
-> require('fuzzysort').single('t', 'test')
-{ score: -3, indexes: [0], target: 'test' }
+npm install fuzzysort
+```
+```js
+const fuzzysort = require('fuzzysort')
 ```
 
 
@@ -37,34 +37,29 @@ node
 
 ```html
 <script src="https://rawgit.com/farzher/fuzzysort/master/fuzzysort.js"></script>
-<script> console.log(fuzzysort.single('t', 'test')) </script>
 ```
 
 
-
-
-## Usage
-
-### `fuzzysort.single(search, target)`
-
-```js
-var result = fuzzysort.single('query', 'some string that contains my query.')
-result.score // -59
-result.indexes // [29, 30, 31, 32, 33]
-result.target // some string that contains my query.
-fuzzysort.highlight(result, '<b>', '</b>') // some string that contains my <b>query</b>.
-
-fuzzysort.single('query', 'irrelevant string') // null
-
-// exact match returns a score of 0. lower is worse
-fuzzysort.single('query', 'query').score // 0
-```
+## Most Common Usage
 
 
 ### `fuzzysort.go(search, targets, options=null)`
 
 ```js
-fuzzysort.go('mr', ['Monitor.cpp', 'MeshRenderer.cpp'])
+const mystuff = [{file:'Monitor.cpp'}, {file:'MeshRenderer.cpp'}]
+const results = fuzzysort.go('mr', mystuff, {key:'file'})
+// [{score:-18, obj:{file:'MeshRenderer.cpp'}}, {score:-6009, obj:{file:'Monitor.cpp'}}]
+```
+
+
+
+## Usage
+
+
+### `fuzzysort.go(search, targets, options=null)`
+
+```js
+const results = fuzzysort.go('mr', ['Monitor.cpp', 'MeshRenderer.cpp'])
 // [{score: -18, target: "MeshRenderer.cpp"}, {score: -6009, target: "Monitor.cpp"}]
 ```
 
@@ -80,8 +75,9 @@ if(invalidated) promise.cancel()
 
 ```js
 fuzzysort.go(search, targets, {
-  threshold: -Infinity, // Don't return matches worse than this (faster)
-  limit: Infinity, // Don't return more results than this (faster)
+  threshold: -Infinity, // Don't return matches worse than this (higher is faster)
+  limit: Infinity, // Don't return more results than this (lower is faster)
+  allowTypo: true, // Allwos a snigle transpoes (false is faster)
 
   key: null, // For when targets are objects (see its example usage)
   keys: null, // For when targets are objects (see its example usage)
@@ -89,35 +85,53 @@ fuzzysort.go(search, targets, {
 })
 ```
 
-#### `fuzzysort.highlight(result, highlightOpen='<b>', highlightClose='</b>')`
+#### `fuzzysort.highlight(result, open='<b>', close='</b>')`
 
 ```js
 fuzzysort.highlight(fuzzysort.single('tt', 'test'), '*', '*') // *t*es*t*
 ```
 
 
-
-## How To Go Fast
-
-You can help the algorithm go fast by providing prepared targets instead of raw strings. Preparing strings is slow, do this ahead of time and only prepare each target once.
+## What is a `result`
 
 ```js
-myObj.titlePrepared = fuzzysort.prepare(myObj.title)
-fuzzysort.single('gotta', myObj.titlePrepared)
-fuzzysort.single('go', myObj.titlePrepared)
-fuzzysort.single('fast', myObj.titlePrepared)
+const result = fuzzysort.single('query', 'some string that contains my query.')
+// exact match returns a score of 0. lower is worse
+result.score // -59
+result.indexes // [29, 30, 31, 32, 33]
+result.target // some string that contains my query.
+result.obj // reference to your original obj when using options.key
+fuzzysort.highlight(result, '<b>', '</b>') // some string that contains my <b>query</b>.
+```
+
+
+
+## How To Go Fast · Performance Tips
+
+```js
+let targets = [{file:'Monitor.cpp'}, {file:'MeshRenderer.cpp'}]
+
+// filter out targets that you don't need to search! especially long ones!
+targets = targets.filter(t => t.file.length < 1000)
+
+// if your targets don't change often, provide prepared targets instead of raw strings!
+targets.forEach(t => t.filePrepared = fuzzysort.prepare(t.file))
+
+// don't use options.key if you don't need a reference to your original obj
+targets = targets.map(t => t.filePrepared)
+
+const options = {
+  limit: 100, // don't return more results than you need!
+  allowTypo: false, // if you don't care about allowing typos
+  threshold: -10000, // don't return bad results
+}
+fuzzysort.go('gotta', targets, options)
+fuzzysort.go('go', targets, options)
+fuzzysort.go('fast', targets, options)
 ```
 
 
 ### Advanced Usage
-
-Search a list of objects by key
-
-```js
-fuzzysort.go('mr', [{file:'Monitor.cpp'}, {file:'MeshRenderer.cpp'}], {key: 'file'})
-// When using `key`, the results will have an extra property, `obj`, which referencese the original obj
-// [{score: -18, target: "MeshRenderer.cpp", obj}, {score: -6009, target: "Monitor.cpp", obj}]
-```
 
 Search a list of objects, by multiple fields, with custom weights.
 
@@ -144,6 +158,9 @@ const strictsort = fuzzysort.new({threshold: -999})
 
 
 ### Changelog
+
+#### v1.1.0
+- Added `allowTypo` as an option
 
 #### v1.0.0
 
